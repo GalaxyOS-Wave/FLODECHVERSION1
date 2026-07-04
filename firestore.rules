@@ -201,6 +201,18 @@ service cloud.firestore {
         && data.createdAt is timestamp;
     }
 
+    function isValidResource(data) {
+      return data.id is string
+        && data.academyId is string
+        && data.title is string
+        && data.title.size() >= 2
+        && data.title.size() <= 200
+        && data.description is string
+        && data.type is string
+        && data.url is string
+        && data.createdAt is timestamp;
+    }
+
 
     // 4. Match Blocks
     // USERS COLLECTION
@@ -211,10 +223,9 @@ service cloud.firestore {
 
     // ACADEMIES COLLECTION
     match /academies/{academyId} {
-      allow get: if true; // Any visitor (public or signed in) can read individual academy info
-      allow list: if isSignedIn();
+      allow get, list: if true; // Any visitor (public or signed in) can read, search, and list academies
       allow create: if isSignedIn() && incoming().ownerId == request.auth.uid;
-      allow update: if isSignedIn() && (resource == null || existing().ownerId == request.auth.uid);
+      allow update: if (isSignedIn() && (resource == null || existing().ownerId == request.auth.uid)) || (incoming().diff(existing()).affectedKeys().hasOnly(['subscriptionStatus']));
       allow delete: if isSignedIn() && (resource == null || existing().ownerId == request.auth.uid);
     }
 
@@ -308,5 +319,29 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // RESOURCES COLLECTION
+    match /resources/{resourceId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isAcademyOwner(incoming().academyId) && isValidResource(incoming());
+      allow update: if isSignedIn() && (resource == null || isAcademyOwner(resource.data.academyId)) && isValidResource(incoming());
+      allow delete: if isSignedIn() && (resource == null || isAcademyOwner(resource.data.academyId));
+    }
+
+    // CONNECT PROJECTS COLLECTION
+    match /connect_projects/{projectId} {
+      allow read, write: if true;
+    }
+
+    // STUDENT DEADLINES COLLECTION
+    match /student_deadlines/{deadlineId} {
+      allow read, write: if true;
+    }
+
+    // CONNECT POSTS COLLECTION
+    match /connect_posts/{postId} {
+      allow read, write: if true;
+    }
   }
 }
+
